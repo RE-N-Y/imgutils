@@ -235,12 +235,25 @@ class ClassifyModel:
         """
         with self._model_lock:
             if model_name not in self._models:
-                self._check_model_name(model_name)
-                self._models[model_name] = open_onnx_model(hf_hub_download(
-                    self.repo_id,
-                    f'{model_name}/model.onnx',
-                    token=self._get_hf_token(),
-                ))
+                
+                download_path = None
+                hf_home = os.environ.get('HF_HOME')
+                if hf_home:
+                    repo, model_name = self.repo_id.split("/")
+                    candidates = Path(hf_home)
+                    candidates = list(candidates.glob(f"hub/models--{repo}--{model_name}/snapshots/**/model.onnx"))
+                    if len(candidates) > 0:
+                        download_path = candidates.pop()
+
+                if download_path is None:
+                    self._check_model_name(model_name)
+                    download_path = hf_hub_download(
+                        self.repo_id,
+                        f'{model_name}/model.onnx',
+                        token=self._get_hf_token(),
+                    )
+                
+                self._models[model_name] = open_onnx_model(download_path)
 
         return self._models[model_name]
 
